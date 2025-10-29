@@ -1,0 +1,984 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IG Carousel Creator</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Configure Tailwind to use 'Inter' font and enable custom colors -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        inter: ['Inter', 'sans-serif'],
+                        montserrat: ['Montserrat', 'sans-serif'],
+                        roboto: ['Roboto', 'sans-serif'],
+                    },
+                    colors: {
+                        'gray-900': '#111827',
+                        'gray-800': '#1f2937',
+                        'gray-700': '#374151',
+                        'indigo-600': '#4f46e5',
+                        'indigo-700': '#4338ca',
+                        'yellow-400': '#facc15',
+                        'green-600': '#10b981',
+                    },
+                }
+            }
+        }
+    </script>
+    <!-- Load React and ReactDOM -->
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <!-- Load Babel for JSX transformation in the browser -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- Load html2canvas for image export -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+</head>
+<body class="bg-gray-900">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useCallback, useRef, useMemo } = React;
+
+        // --- CONSTANTS ---
+        const API_KEY = ""; // Placeholder for fetch calls
+
+        const defaultProfile = {
+            name: 'Peter Carvell',
+            website: 'Homeworkoutfactory.com',
+            photoUrl: 'https://placehold.co/100x100/F7C400/000?text=P',
+        };
+
+        const defaultBrandSettings = {
+            bgColor: '#000000',
+            textColor: '#FFFFFF',
+            headlineColor: '#F7C400', 
+            accentColor: '#F7C400',
+            fontFamily: 'Inter',
+            profile: defaultProfile,
+        };
+
+        const initialSlides = [
+            { id: 1, title: 'Fasted Morning Cardio', body: 'Game-Changer or Overhyped?', type: 'hook', titleSize: 'text-5xl', bodySize: 'text-2xl', icon: '🔥' },
+            { id: 2, title: 'The Smart Way:', body: 'When paired with a smart plan, with the right timing, and at the right intensity... it can absolutely help you accelerate your results.', type: 'educational', titleSize: 'text-3xl', bodySize: 'text-xl', icon: '✅' },
+            { id: 3, title: 'Action Plan', body: 'Join my free 7 day fat loss kick start challenge for consistent progress.', type: 'cta', titleSize: 'text-3xl', bodySize: 'text-xl', icon: '➡️' },
+        ];
+
+        const popularEmojis = [
+            '💡', '🚀', '🔥', '✅', '❌', '🔑', '🧠', '💪',
+            '🎯', '💰', '📈', '📉', '✨', '🤯', '🤔', '👀',
+            '❤️', '⚡️', '⬇️', '⬆️', '➡️', '🗓️', '📖', '🛠️'
+        ];
+
+        let nextId = 4; // Start after initial slides
+
+        // --- UTILITY ICONS (Inline SVGs) ---
+        const Icon = ({ children, className = "w-6 h-6", onClick }) => (
+            <div className={className} onClick={onClick} role="button" tabIndex="0" aria-label="icon button">
+                <svg fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-full h-full">
+                    {children}
+                </svg>
+            </div>
+        );
+        const ArrowRight = ({ className = "w-6 h-6", accentColor }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={3} stroke={accentColor} className={className}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M17.25 8.25L21 12m0 0l-3.75 3.75M21 12H3" />
+            </svg>
+        );
+        const Trash = (props) => ( <Icon {...props}><path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.166L15.9 5.23L12 3L8.1 5.23m-4.04.595c.34.059.68.114 1.022.166m-1.022-.166L7.4 5.23L11.3 3m.7-3v21m0-21h-5.25a2.25 2.25 0 00-2.25 2.25v1.5a2.25 2.25 0 002.25 2.25H12V3h5.25A2.25 2.25 0 0019.5 5.25v1.5a2.25 2.25 0 00-2.25 2.25H12" /></Icon> );
+        const Copy = (props) => ( <Icon {...props}><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 17.25v2.25a.75.75 0 01-.75.75H4.5A2.25 2.25 0 012.25 18V7.5a2.25 2.25 0 012.25-2.25h9a.75.75 0 01.75.75V7.5M10.5 10.5h4.5a.75.75 0 00.75-.75V5.25a.75.75 0 00-.75-.75h-4.5a.75.75 0 00-.75.75v4.5a.75.75 0 00.75.75z" /></Icon> );
+        const Plus = (props) => ( <Icon {...props}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></Icon> );
+        const Sparkles = (props) => ( <Icon {...props}><path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9.428 17.4l-.16.657a.75.75 0 01-1.08.384l-.841-.531a.75.75 0 01-.337-.847L7.001 15.9m10.187-5.904l.385 1.496.16.657a.75.75 0 011.08.384l.841-.531a.75.75 0 01.337-.847l-.271-1.071m-2.126-2.126l.16.657a.75.75 0 01-1.08.384l-.841-.531a.75.75 0 01-.337-.847l.271-1.071m-2.126 2.126l-.385 1.496-.16.657a.75.75 0 01-1.08.384l-.841-.531a.75.75 0 01-.337-.847l.271-1.071" /></Icon> );
+        const Edit = (props) => ( <Icon {...props}><path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 18.288a.75.75 0 01-.225.594l-3.25 3.25a.75.75 0 01-.981-.227l-2.65-2.65a.75.75 0 01-.227-.981l3.25-3.25a.75.75 0 01.594-.225l10.58-10.58z" /></Icon> );
+
+        // ----------------------------------------------------------------------
+        // 1. Core Component: SlidePreview 
+        // ----------------------------------------------------------------------
+        const SlidePreview = React.forwardRef(({ slide, brandSettings, index, totalSlides }, ref) => {
+            const { bgColor, textColor, headlineColor, accentColor, fontFamily, profile } = brandSettings;
+            const { title, body, icon } = slide;
+
+            const isLastSlide = index === totalSlides - 1;
+
+            return (
+                <div 
+                    ref={ref}
+                    className="w-full aspect-[4/5] max-w-[400px] h-auto p-8 rounded-xl shadow-2xl relative flex flex-col justify-between"
+                    style={{ 
+                        backgroundColor: bgColor, 
+                        color: textColor, 
+                        fontFamily: `${fontFamily}, sans-serif`,
+                        minHeight: '500px'
+                    }}
+                >
+                    {/* --- Profile Header (Always Top) --- */}
+                    <div className="absolute top-8 left-8 right-8 flex items-center justify-between z-10">
+                        <div className="flex items-center space-x-3">
+                            <img 
+                                src={profile.photoUrl} 
+                                alt="Profile" 
+                                className="w-12 h-12 rounded-full border-4 object-cover"
+                                style={{ borderColor: accentColor }}
+                                onError={(e) => {
+                                    e.target.onerror = null; 
+                                    e.target.src="https://placehold.co/100x100/F7C400/000?text=P";
+                                }}
+                            />
+                            <div>
+                                <p className="text-base font-bold leading-none" style={{ color: headlineColor }}>{profile.name}</p>
+                                <p className="text-sm font-semibold leading-none opacity-80" style={{ color: accentColor }}>{profile.website}</p>
+                            </div>
+                        </div>
+                        {/* Pagination */}
+                        <span className="text-sm opacity-60">{index + 1}/{totalSlides}</span>
+                    </div>
+
+                    {/* --- Content Area --- */}
+                    <div className="flex-grow flex flex-col justify-center py-20">
+                        {/* Only render icon if it exists */}
+                        {icon && <span className="text-6xl mb-4">{icon}</span>}
+                        
+                        {/* Title (Now uses headlineColor) */}
+                        <h1 
+                            className={`font-black tracking-tight mb-4 ${slide.titleSize || 'text-5xl'}`}
+                            style={{ lineHeight: 1.1, color: headlineColor }}
+                        >
+                            {title}
+                        </h1>
+                        
+                        {/* Body */}
+                        <p 
+                            className={`font-light ${slide.bodySize || 'text-xl'} leading-relaxed`}
+                            style={{ color: textColor }}
+                        >
+                            {body}
+                        </p>
+                    </div>
+
+                    {/* --- Bottom Arrow & Pagination --- */}
+                    <div className="flex justify-end items-center mt-4">
+                        {
+                            !isLastSlide ? (
+                                <ArrowRight className="w-12 h-12" accentColor={accentColor} />
+                            ) : (
+                                <p className="text-sm font-bold" style={{ color: accentColor }}>END</p>
+                            )
+                        }
+                    </div>
+                </div>
+            );
+        });
+
+
+        // ----------------------------------------------------------------------
+        // 2. Component: AIGenerationController 
+        // ----------------------------------------------------------------------
+        const AIGenerationController = ({ setSlides, setIsLoading, isLoading, setContentMode }) => {
+            const [aiTopic, setAiTopic] = useState('');
+            const [aiSlideCount, setAiSlideCount] = useState('4');
+
+            const generateContentAI = async () => {
+                const slideCount = parseInt(aiSlideCount, 10);
+                
+                if (!aiTopic || isNaN(slideCount) || slideCount < 2 || slideCount > 10) {
+                    console.error('Invalid topic or slide count (must be between 2 and 10).');
+                    return;
+                }
+
+                setIsLoading(true);
+                
+                const structure = [];
+                structure.push('{ "title": "Hook Title", "body": "Catchy starting line...", "type": "hook", "icon": "emoji" }');
+                for (let i = 0; i < slideCount - 2; i++) {
+                    structure.push(`{ "title": "Key Point ${i + 1}", "body": "Educational detail ${i + 1}...", "type": "educational", "icon": "emoji" }`);
+                }
+                if (slideCount > 1) { 
+                    structure.push('{ "title": "Call to Action", "body": "Motivational summary and CTA...", "type": "cta", "icon": "emoji" }');
+                }
+
+                const systemPrompt = `You are a professional social media content creator specializing in bold, minimal Instagram carousels. The output MUST be a JSON array of exactly ${slideCount} objects, following this structure exactly: [${structure.join(', ')}]. The first slide MUST have type "hook", the last slide MUST have type "cta", and all slides in between MUST have type "educational".
+                The response MUST NOT include any conversational text or markdown outside the JSON block. Ensure titles are short and punchy, and the text is clear for a fitness/lifestyle audience. Use relevant emojis.`;
+
+                const userQuery = `Create a ${slideCount}-slide Instagram carousel content structure for the topic: "${aiTopic}".`;
+
+                const payload = {
+                    contents: [{ parts: [{ text: userQuery }] }],
+                    systemInstruction: { parts: [{ text: systemPrompt }] },
+                    generationConfig: {
+                        responseMimeType: "application/json",
+                        responseSchema: {
+                            type: "ARRAY",
+                            items: {
+                                type: "OBJECT",
+                                properties: {
+                                    "title": { "type": "STRING", description: "Short, bold slide title" },
+                                    "body": { "type": "STRING", description: "The main text content, less than 20 words" },
+                                    "type": { "type": "STRING", enum: ["hook", "educational", "cta"] },
+                                    "icon": { "type": "STRING", description: "A relevant emoji icon" }
+                                },
+                                required: ["title", "body", "type", "icon"]
+                            }
+                        }
+                    }
+                };
+
+                try {
+                    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${API_KEY}`;
+                    
+                    let response;
+                    let result;
+                    const maxRetries = 3;
+                    let attempt = 0;
+
+                    while (attempt < maxRetries) {
+                        attempt++;
+                        response = await fetch(apiUrl, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(payload)
+                        });
+
+                        if (response.ok) {
+                            result = await response.json();
+                            break;
+                        } else if (attempt < maxRetries && response.status === 429) {
+                            console.warn(`Attempt ${attempt}: Rate limit hit. Retrying in ${1000 * (2 ** attempt)}ms...`);
+                            await new Promise(resolve => setTimeout(resolve, 1000 * (2 ** attempt)));
+                        } else {
+                            throw new Error(`API request failed with status: ${response.status}`);
+                        }
+                    }
+                    
+                    if (!result || !result.candidates || result.candidates.length === 0) {
+                        throw new Error("Received empty or malformed response from API.");
+                    }
+
+                    const jsonString = result.candidates[0].content.parts[0].text;
+                    const parsedJson = JSON.parse(jsonString);
+
+                    // Map AI content to slide structure
+                    const newSlides = parsedJson.map((aiSlide, index) => ({
+                        id: nextId++,
+                        title: aiSlide.title,
+                        body: aiSlide.body,
+                        type: aiSlide.type,
+                        icon: aiSlide.icon,
+                        titleSize: index === 0 ? 'text-5xl' : 'text-3xl',
+                        bodySize: index === 0 ? 'text-2xl' : 'text-xl',
+                    }));
+
+                    setSlides(newSlides);
+                    setContentMode('manual');
+
+                } catch (error) {
+                    console.error('AI Content Generation Error:', error);
+                } finally {
+                    setIsLoading(false);
+                }
+            };
+
+            const handleCountChange = (step) => {
+                const currentCount = parseInt(aiSlideCount, 10);
+                let newCount = currentCount;
+                if (step === 1) {
+                    newCount = Math.min(10, currentCount + 1);
+                } else if (step === -1) {
+                    newCount = Math.max(2, currentCount - 1);
+                }
+                setAiSlideCount(String(newCount));
+            };
+            
+            const resetAI = () => {
+                setAiTopic('');
+                setAiSlideCount('4');
+                setIsLoading(false);
+            };
+
+            const currentSlideCount = parseInt(aiSlideCount, 10);
+
+            return (
+                <div className="space-y-4">
+                    <h3 className="text-lg font-bold text-indigo-400 flex items-center">
+                        <Sparkles className="w-5 h-5 mr-2 text-yellow-400"/> Auto-Generate Slides
+                    </h3>
+                    <p className="text-sm text-gray-400">Enter a topic and the desired number of slides (2-10). The AI will create the content structure.</p>
+
+                    <label className="block text-sm font-medium text-gray-400">Carousel Topic</label>
+                    
+                    <div className="flex space-x-2">
+                        <input
+                            type="text"
+                            placeholder="E.g., 5 ways to improve shoulder mobility"
+                            value={aiTopic}
+                            onChange={(e) => setAiTopic(e.target.value)} 
+                            className="flex-1 p-3 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:ring-indigo-500 focus:border-indigo-500"
+                            disabled={isLoading}
+                        />
+                        <button
+                            onClick={resetAI}
+                            className={`p-3 rounded-lg text-sm transition font-semibold ${isLoading ? 'bg-gray-700 text-gray-500 cursor-not-allowed' : 'bg-red-600 hover:bg-red-700 text-white'}`}
+                            disabled={isLoading}
+                            aria-label="Clear AI form and reset loading state"
+                        >
+                            Clear
+                        </button>
+                    </div>
+
+                    <label className="block text-sm font-medium text-gray-400">Number of Slides (2-10)</label>
+                    
+                    <div className="flex items-center space-x-2">
+                        <button
+                            onClick={() => handleCountChange(-1)}
+                            disabled={isLoading || currentSlideCount <= 2}
+                            className="p-3 bg-gray-700 text-white rounded-lg hover:bg-gray-600 disabled:opacity-50 transition font-extrabold text-lg w-1/5"
+                        >
+                            -
+                        </button>
+                        <input
+                            type="text"
+                            readOnly
+                            value={aiSlideCount} 
+                            className="flex-1 text-center p-3 bg-gray-700 border border-indigo-500 rounded-lg text-white text-xl font-extrabold"
+                        />
+                        <button
+                            onClick={() => handleCountChange(1)}
+                            disabled={isLoading || currentSlideCount >= 10}
+                            className="p-3 bg-gray-700 text-white rounded-lg hover:bg-gray-600 disabled:opacity-50 transition font-extrabold text-lg w-1/5"
+                        >
+                            +
+                        </button>
+                    </div>
+
+                    <button
+                        onClick={generateContentAI}
+                        className={`w-full flex items-center justify-center p-3 font-bold rounded-lg transition duration-150 shadow-md mt-4 ${
+                            isLoading || !aiTopic || currentSlideCount < 2 || currentSlideCount > 10
+                            ? 'bg-indigo-700 cursor-not-allowed text-gray-400' 
+                            : 'bg-indigo-600 hover:bg-indigo-700 text-white'
+                        }`}
+                        disabled={isLoading || !aiTopic || currentSlideCount < 2 || currentSlideCount > 10}
+                    >
+                        {isLoading ? (
+                            <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                        ) : (
+                            <Sparkles className="w-5 h-5 mr-1"/>
+                        )}
+                        {isLoading ? 'Generating...' : 'Start AI Generation'}
+                    </button>
+                </div>
+            );
+        };
+
+
+        // ----------------------------------------------------------------------
+        // 3. Optimized Content Editor Component (Fixes Typing Lag + Adds Emoji Picker)
+        // ----------------------------------------------------------------------
+        const ContentEditorOptimized = ({ activeSlide, activeSlideIndex, handleSlideUpdate }) => {
+            
+            // Local state for Title and Body to handle rapid typing without causing global re-renders
+            const [localTitle, setLocalTitle] = useState(activeSlide?.title || '');
+            const [localBody, setLocalBody] = useState(activeSlide?.body || '');
+            const [isPickerOpen, setIsPickerOpen] = useState(false);
+            
+            // Refs for click-outside logic
+            const pickerRef = useRef(null);
+            const inputRef = useRef(null);
+
+
+            // Sync local state when the active slide object changes
+            useEffect(() => {
+                if (activeSlide) {
+                    setLocalTitle(activeSlide.title);
+                    setLocalBody(activeSlide.body);
+                }
+            }, [activeSlide]);
+
+            // Click outside handler for closing the emoji picker
+            useEffect(() => {
+                const handleClickOutside = (event) => {
+                    if (
+                        isPickerOpen &&
+                        pickerRef.current &&
+                        !pickerRef.current.contains(event.target) &&
+                        inputRef.current &&
+                        !inputRef.current.contains(event.target)
+                    ) {
+                        setIsPickerOpen(false);
+                    }
+                };
+                document.addEventListener('mousedown', handleClickOutside);
+                return () => document.removeEventListener('mousedown', handleClickOutside);
+            }, [isPickerOpen]);
+
+            // Handler to commit Title changes to global state only when the input loses focus (onBlur)
+            const handleTitleBlur = () => {
+                if (localTitle !== activeSlide.title) {
+                    handleSlideUpdate('title', localTitle);
+                }
+            };
+
+            // Handler to commit Body changes to global state only when the input loses focus (onBlur)
+            const handleBodyBlur = () => {
+                if (localBody !== activeSlide.body) {
+                    handleSlideUpdate('body', localBody);
+                }
+            };
+            
+            // Handler for Icon selection updates instantly
+            const handleIconSelect = (emoji) => {
+                handleSlideUpdate('icon', emoji);
+                setIsPickerOpen(false);
+            };
+
+            // Handler for instant updates (like font size)
+            const handleInstantUpdate = (key, value) => {
+                handleSlideUpdate(key, value);
+            };
+
+            if (!activeSlide) return <p className="text-gray-400">Select a slide to edit.</p>;
+            
+            return (
+                <div className="space-y-4">
+                    <h3 className="text-lg font-bold text-white">Slide {activeSlideIndex + 1} Content</h3>
+                    
+                    <label className="block text-sm font-medium text-gray-400">Title</label>
+                    <textarea
+                        rows="2"
+                        value={localTitle}
+                        onChange={(e) => setLocalTitle(e.target.value)} // Local update only
+                        onBlur={handleTitleBlur} // Global update on blur
+                        className="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg text-white font-bold text-xl resize-none focus:ring-indigo-500 focus:border-indigo-500"
+                        placeholder="Slide Title (e.g., 'Fasted Cardio')"
+                    />
+                    
+                    <label className="block text-sm font-medium text-gray-400">Body Content</label>
+                    <textarea
+                        rows="5"
+                        value={localBody}
+                        onChange={(e) => setLocalBody(e.target.value)} // Local update only
+                        onBlur={handleBodyBlur} // Global update on blur
+                        className="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg text-white text-base resize-none focus:ring-indigo-500 focus:border-indigo-500"
+                        placeholder="Detailed content or main message."
+                    />
+
+                    <div className="flex space-x-4">
+                        <div className="flex-1 relative">
+                            <label className="block text-sm font-medium text-gray-400">Icon/Emoji</label>
+                            
+                            {/* Input field acts as a clickable selector */}
+                            <div
+                                ref={inputRef}
+                                onClick={() => setIsPickerOpen(prev => !prev)}
+                                className={`w-full p-3 border rounded-lg text-white text-2xl text-center cursor-pointer flex items-center justify-center h-[52px] transition ${
+                                    activeSlide.icon ? 'bg-gray-700 border-gray-600' : 'bg-gray-800 border-dashed border-gray-600 hover:border-indigo-500'
+                                }`}
+                                role="button"
+                                tabIndex="0"
+                            >
+                                {activeSlide.icon ? activeSlide.icon : <span className="text-sm text-gray-400">Click to Select</span>}
+                            </div>
+                            
+                            {/* Emoji Picker Dropdown */}
+                            {isPickerOpen && (
+                                <div 
+                                    ref={pickerRef} 
+                                    className="absolute top-full mt-2 left-0 right-0 bg-gray-700 p-3 rounded-lg shadow-2xl z-20 grid grid-cols-6 gap-2 border border-indigo-500"
+                                >
+                                    {popularEmojis.map((emoji) => (
+                                        <button
+                                            key={emoji}
+                                            onClick={() => handleIconSelect(emoji)}
+                                            className="p-1 text-2xl rounded-md hover:bg-gray-600 transition"
+                                        >
+                                            {emoji}
+                                        </button>
+                                    ))}
+                                    {/* Clear button */}
+                                    <button
+                                        onClick={() => handleIconSelect('')}
+                                        className="col-span-6 p-1 text-sm text-center text-red-400 rounded-md hover:bg-gray-600 transition"
+                                    >
+                                        Clear Icon
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    <div className="flex space-x-4">
+                        <div className="flex-1">
+                            <label className="block text-sm font-medium text-gray-400">Title Size</label>
+                            <select
+                                value={activeSlide.titleSize || 'text-3xl'}
+                                onChange={(e) => handleInstantUpdate('titleSize', e.target.value)}
+                                className="w-full p-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:ring-indigo-500 focus:border-indigo-500"
+                            >
+                                <option value="text-xl">XL</option>
+                                <option value="text-3xl">3XL</option>
+                                <option value="text-5xl">5XL (Hook)</option>
+                                <option value="text-7xl">7XL (Huge)</option>
+                            </select>
+                        </div>
+                        <div className="flex-1">
+                            <label className="block text-sm font-medium text-gray-400">Body Size</label>
+                            <select
+                                value={activeSlide.bodySize || 'text-xl'}
+                                onChange={(e) => handleInstantUpdate('bodySize', e.target.value)}
+                                className="w-full p-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:ring-indigo-500 focus:border-indigo-500"
+                            >
+                                <option value="text-sm">SM</option>
+                                <option value="text-base">Base</option>
+                                <option value="text-xl">XL</option>
+                                <option value="text-2xl">2XL</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+
+        // ----------------------------------------------------------------------
+        // 4. Main App Component
+        // ----------------------------------------------------------------------
+        const App = () => {
+            // STATE
+            const [brandSettings, setBrandSettings] = useState(defaultBrandSettings);
+            const [slides, setSlides] = useState(initialSlides);
+            const [activeSlideIndex, setActiveSlideIndex] = useState(0);
+            const [isLoading, setIsLoading] = useState(false);
+            const [isDownloading, setIsDownloading] = useState(false);
+            const [contentMode, setContentMode] = useState('manual');
+            
+            // REFS
+            const slideRefs = useRef({}); 
+            
+            const activeSlide = slides[activeSlideIndex];
+
+            // --- Data Handlers ---
+
+            const handleBrandChange = (key, value) => {
+                if (key === 'profileName') {
+                    setBrandSettings(prev => ({ ...prev, profile: { ...prev.profile, name: value } }));
+                } else if (key === 'profileWebsite') {
+                    setBrandSettings(prev => ({ ...prev, profile: { ...prev.profile, website: value } }));
+                } else {
+                    setBrandSettings(prev => ({ ...prev, [key]: value }));
+                }
+            };
+            
+            const handleProfileImageUpload = (event) => {
+                const file = event.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        setBrandSettings(prev => ({
+                            ...prev,
+                            profile: { ...prev.profile, photoUrl: e.target.result }
+                        }));
+                    };
+                    reader.readAsDataURL(file);
+                }
+            };
+
+            // This is the universal updater function used by ContentEditorOptimized's onBlur and instant change handlers.
+            const handleSlideUpdate = (key, value) => {
+                const newSlides = slides.map((slide, index) =>
+                    index === activeSlideIndex ? { ...slide, [key]: value } : slide
+                );
+                setSlides(newSlides);
+            };
+
+            const addSlide = (type = 'educational') => {
+                const newSlide = {
+                    id: nextId++,
+                    title: 'New Slide Title',
+                    body: 'New content here.',
+                    type: type,
+                    icon: '', // New slides start with an empty icon
+                    titleSize: 'text-3xl',
+                    bodySize: 'text-xl',
+                };
+                setSlides([...slides, newSlide]);
+                setActiveSlideIndex(slides.length);
+            };
+
+            const deleteSlide = (index) => {
+                if (slides.length <= 1) return;
+                const newSlides = slides.filter((_, i) => i !== index);
+                setSlides(newSlides);
+                setActiveSlideIndex(Math.max(0, index - 1));
+            };
+
+            const duplicateSlide = (index) => {
+                const slideToDuplicate = slides[index];
+                const newSlide = { ...slideToDuplicate, id: nextId++ };
+                const newSlides = [...slides.slice(0, index + 1), newSlide, ...slides.slice(index + 1)];
+                setSlides(newSlides);
+                setActiveSlideIndex(index + 1);
+            };
+
+            const reorderSlide = (fromIndex, toIndex) => {
+                const newSlides = [...slides];
+                const [movedItem] = newSlides.splice(fromIndex, 1);
+                newSlides.splice(toIndex, 0, movedItem);
+                setSlides(newSlides);
+                setActiveSlideIndex(toIndex);
+            };
+
+            // --- Download Logic using html2canvas ---
+            const handleDownload = async (format = 'png') => {
+                if (typeof window.html2canvas === 'undefined') {
+                     console.error('html2canvas library is not loaded. Please wait a moment for it to load or refresh.');
+                     return;
+                }
+
+                if (slides.length === 0) {
+                    console.warn('No slides to download.');
+                    return;
+                }
+
+                setIsDownloading(true);
+
+                try {
+                    for (let i = 0; i < slides.length; i++) {
+                        // Ensure the ref is attached to the current slide being rendered for export
+                        const element = slideRefs.current[slides[i].id]; 
+                        if (!element) {
+                            console.error(`Ref for slide ${i + 1} (ID: ${slides[i].id}) not found.`);
+                            continue;
+                        }
+
+                        // Use the currently rendered element in the hidden area for high-quality export
+                        const canvas = await window.html2canvas(element, {
+                            scale: 3, 
+                            useCORS: true, 
+                            allowTaint: true
+                        });
+
+                        const dataUrl = canvas.toDataURL(`image/${format}`, format === 'jpeg' ? 0.9 : 1.0);
+                        
+                        const link = document.createElement('a');
+                        link.href = dataUrl;
+                        link.download = `carousel_slide_${i + 1}_${slides[i].title.replace(/\s/g, '_').substring(0, 20)}.${format}`;
+                        
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                        
+                        // Small delay to prevent browser from getting overwhelmed
+                        await new Promise(resolve => setTimeout(resolve, 300));
+                    }
+                } catch (error) {
+                    console.error('Error during image export:', error);
+                } finally {
+                    setIsDownloading(false);
+                }
+            };
+            // --- END DOWNLOAD LOGIC ---
+
+
+            // --- UI Components ---
+
+            const ColorPicker = ({ label, value, onChange, colorKey }) => (
+                <div className="flex items-center justify-between">
+                    <label className="text-sm font-medium text-gray-400">{label}</label>
+                    <input
+                        type="color"
+                        value={value}
+                        onChange={(e) => onChange(colorKey, e.target.value)}
+                        className="w-10 h-10 border-2 border-gray-600 rounded-lg cursor-pointer"
+                    />
+                </div>
+            );
+            
+            const BrandSetupPanel = () => (
+                <div className="space-y-4">
+                    <h3 className="text-lg font-bold text-white">Brand & Colors</h3>
+                    <ColorPicker label="Background Color" value={brandSettings.bgColor} onChange={handleBrandChange} colorKey="bgColor" />
+                    <ColorPicker label="Text Color (Body)" value={brandSettings.textColor} onChange={handleBrandChange} colorKey="textColor" />
+                    <ColorPicker label="Headline Color" value={brandSettings.headlineColor} onChange={handleBrandChange} colorKey="headlineColor" />
+                    <ColorPicker label="Accent/CTA Color" value={brandSettings.accentColor} onChange={handleBrandChange} colorKey="accentColor" />
+
+                    <div className="border-t border-gray-700 pt-4 space-y-3">
+                        <h4 className="font-semibold text-gray-300">Profile Header</h4>
+                        
+                        <div className="flex items-center space-x-3 p-2 bg-gray-700 rounded-lg">
+                            <img 
+                                src={brandSettings.profile.photoUrl} 
+                                alt="Profile Preview" 
+                                className="w-10 h-10 rounded-full object-cover border-2 flex-shrink-0"
+                                style={{ borderColor: brandSettings.accentColor }}
+                                onError={(e) => {
+                                    e.target.onerror = null; 
+                                    e.target.src="https://placehold.co/100x100/F7C400/000?text=P";
+                                }}
+                            />
+                            <label htmlFor="profile-upload" className="flex-1 p-1 text-sm bg-gray-600 hover:bg-gray-500 rounded-md text-white text-center cursor-pointer transition truncate">
+                                {brandSettings.profile.photoUrl.startsWith('data:') ? 'Change Photo' : 'Upload Photo'}
+                            </label>
+                            <input
+                                id="profile-upload"
+                                type="file"
+                                accept="image/*"
+                                onChange={handleProfileImageUpload}
+                                className="hidden"
+                            />
+                        </div>
+
+                        <input
+                            type="text"
+                            placeholder="Profile Name"
+                            value={brandSettings.profile.name}
+                            onChange={(e) => handleBrandChange('profileName', e.target.value)}
+                            className="w-full p-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:ring-indigo-500 focus:border-indigo-500"
+                        />
+                        <input
+                            type="text"
+                            placeholder="Website/CTA"
+                            value={brandSettings.profile.website}
+                            onChange={(e) => handleBrandChange('profileWebsite', e.target.value)}
+                            className="w-full p-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:ring-indigo-500 focus:border-indigo-500"
+                        />
+                        <select
+                            value={brandSettings.fontFamily}
+                            onChange={(e) => handleBrandChange('fontFamily', e.target.value)}
+                            className="w-full p-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:ring-indigo-500 focus:border-indigo-500"
+                            style={{ fontFamily: brandSettings.fontFamily }}
+                        >
+                            <option value="Inter" style={{ fontFamily: 'Inter' }}>Inter (Default)</option>
+                            <option value="Montserrat" style={{ fontFamily: 'Montserrat' }}>Montserrat</option>
+                            <option value="Roboto" style={{ fontFamily: 'Roboto' }}>Roboto</option>
+                        </select>
+                    </div>
+                </div>
+            );
+            
+            const ContentModeSelector = () => (
+                <div className="p-1 bg-gray-700 rounded-xl flex shadow-lg border border-gray-600 mb-6">
+                    <button
+                        onClick={() => setContentMode('auto')}
+                        className={`flex-1 p-3 text-sm font-semibold rounded-lg transition duration-200 flex items-center justify-center ${
+                            contentMode === 'auto' ? 'bg-indigo-600 text-white shadow-xl' : 'text-gray-300 hover:bg-gray-600'
+                        }`}
+                    >
+                        <Sparkles className="w-4 h-4 mr-2" /> Auto Generate
+                    </button>
+                    <button
+                        onClick={() => setContentMode('manual')}
+                        className={`flex-1 p-3 text-sm font-semibold rounded-lg transition duration-200 flex items-center justify-center ${
+                            contentMode === 'manual' ? 'bg-indigo-600 text-white shadow-xl' : 'text-gray-300 hover:bg-gray-600'
+                        }`}
+                    >
+                        <Edit className="w-4 h-4 mr-2" /> Manually Enter Content
+                    </button>
+                </div>
+            );
+            
+
+            const SlideList = () => (
+                <div className="space-y-3">
+                    <h3 className="text-lg font-bold text-white">Slide Manager ({slides.length} total)</h3>
+                    <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
+                        {slides.map((slide, index) => (
+                            <div
+                                key={slide.id}
+                                className={`p-3 rounded-lg cursor-pointer flex justify-between items-center transition-all ${
+                                    index === activeSlideIndex
+                                        ? 'bg-indigo-600 shadow-lg'
+                                        : 'bg-gray-700 hover:bg-gray-600'
+                                }`}
+                                onClick={() => setActiveSlideIndex(index)}
+                                draggable
+                                onDragStart={(e) => e.dataTransfer.setData("slideIndex", index)}
+                                onDragOver={(e) => e.preventDefault()}
+                                onDrop={(e) => {
+                                    e.preventDefault();
+                                    const fromIndex = parseInt(e.dataTransfer.getData("slideIndex"), 10);
+                                    reorderSlide(fromIndex, index);
+                                }}
+                            >
+                                <span className="text-sm font-semibold text-white truncate">
+                                    {index + 1}. {slide.title || 'Untitled Slide'}
+                                </span>
+                                <div className="flex space-x-2">
+                                    <Copy className="w-5 h-5 text-gray-300 hover:text-white" onClick={(e) => { e.stopPropagation(); duplicateSlide(index); }} />
+                                    {slides.length > 1 && (
+                                        <Trash className="w-5 h-5 text-red-400 hover:text-red-500" onClick={(e) => { e.stopPropagation(); deleteSlide(index); }} />
+                                    )}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                    <button
+                        onClick={() => addSlide()}
+                        className="w-full flex items-center justify-center p-2 mt-4 bg-gray-700 text-gray-300 font-semibold rounded-lg hover:bg-gray-600 transition duration-150"
+                    >
+                        <Plus className="w-5 h-5 mr-2" /> Add New Slide
+                    </button>
+                </div>
+            );
+            
+            // Function to set ref dynamically
+            const setSlideRef = useCallback((element, id) => {
+                if (element) {
+                    slideRefs.current[id] = element;
+                } else {
+                    // Cleanup on unmount/re-render
+                    delete slideRefs.current[id];
+                }
+            }, []);
+
+            return (
+                <div className="min-h-screen bg-gray-900 text-white p-4 sm:p-8 font-inter">
+                    
+                    <header className="mb-8 border-b border-gray-700 pb-4">
+                        <h1 className="text-3xl font-extrabold text-white">
+                            <span className="text-indigo-400">IG</span> Carousel Creator
+                        </h1>
+                        <p className="text-gray-400 mt-1">Design, Brand, and Auto-Generate high-impact Instagram content.</p>
+                    </header>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                        
+                        {/* --- Left Panel (Sidebar & Settings) --- */}
+                        <div className="lg:col-span-3 space-y-6">
+                            <div className="p-5 bg-gray-800 rounded-xl shadow-lg border border-gray-700">
+                                <BrandSetupPanel />
+                            </div>
+                            
+                            {/* Content Mode Selector */}
+                            <ContentModeSelector />
+
+                            <div className="p-5 bg-gray-800 rounded-xl shadow-lg border border-gray-700">
+                                {/* Conditional rendering for content input */}
+                                {contentMode === 'auto' ? (
+                                    <AIGenerationController 
+                                        setSlides={setSlides}
+                                        setIsLoading={setIsLoading}
+                                        isLoading={isLoading}
+                                        setContentMode={setContentMode}
+                                    />
+                                ) : (
+                                    <SlideList />
+                                )}
+                            </div>
+                        </div>
+
+                        {/* --- Center Panel (Preview & Editor) --- */}
+                        <div className="lg:col-span-6 space-y-6">
+                            {/* Preview */}
+                            <div className="flex justify-center items-center w-full">
+                                {slides.length > 0 && (
+                                    <SlidePreview 
+                                        // Set the ref for the currently active slide (important for Download)
+                                        ref={(el) => setSlideRef(el, activeSlide.id)}
+                                        slide={activeSlide} 
+                                        brandSettings={brandSettings} 
+                                        index={activeSlideIndex} 
+                                        totalSlides={slides.length}
+                                    />
+                                )}
+                                {slides.length === 0 && (
+                                     <div className="w-full aspect-[4/5] max-w-[400px] h-auto p-8 rounded-xl shadow-2xl relative flex items-center justify-center bg-gray-800 border-4 border-dashed border-gray-600" style={{ minHeight: '500px' }}>
+                                        <p className="text-gray-400 font-semibold text-center">No Slides. Use Auto Generate or Add a Slide manually.</p>
+                                    </div>
+                                )}
+                            </div>
+                            
+                            {/* Control Buttons */}
+                            <div className="flex justify-center space-x-3 p-4 bg-gray-800 rounded-xl border border-gray-700">
+                                <button
+                                    onClick={() => setActiveSlideIndex(Math.max(0, activeSlideIndex - 1))}
+                                    disabled={activeSlideIndex === 0 || slides.length === 0}
+                                    className="p-2 bg-gray-700 text-gray-300 rounded-lg hover:bg-gray-600 disabled:opacity-50 transition"
+                                >
+                                    Previous
+                                </button>
+                                <button
+                                    onClick={() => setActiveSlideIndex(Math.min(slides.length - 1, activeSlideIndex + 1))}
+                                    disabled={activeSlideIndex === slides.length - 1 || slides.length === 0}
+                                    className="p-2 bg-gray-700 text-gray-300 rounded-lg hover:bg-gray-600 disabled:opacity-50 transition"
+                                >
+                                    Next
+                                </button>
+                            </div>
+                            
+                            {/* Content Editor */}
+                            <div className="p-5 bg-gray-800 rounded-xl shadow-lg border border-gray-700">
+                                <ContentEditorOptimized 
+                                    activeSlide={activeSlide}
+                                    activeSlideIndex={activeSlideIndex}
+                                    handleSlideUpdate={handleSlideUpdate}
+                                />
+                            </div>
+                        </div>
+
+                        {/* --- Right Panel (Export) --- */}
+                        <div className="lg:col-span-3 space-y-6">
+                            <div className="p-5 bg-gray-800 rounded-xl shadow-lg border border-gray-700 space-y-4">
+                                <h3 className="text-lg font-bold text-white">Export Slides</h3>
+                                
+                                <div className="space-y-3">
+                                    <button
+                                        onClick={() => handleDownload('png')}
+                                        disabled={isDownloading || slides.length === 0}
+                                        className={`w-full p-3 text-white font-semibold rounded-lg transition ${isDownloading ? 'bg-green-700/50 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700'}`}
+                                    >
+                                        {isDownloading ? 'Processing PNG...' : 'Download All as PNG'}
+                                    </button>
+                                    <button
+                                        onClick={() => handleDownload('jpeg')}
+                                        disabled={isDownloading || slides.length === 0}
+                                        className={`w-full p-3 text-white font-semibold rounded-lg transition ${isDownloading ? 'bg-green-800/50 cursor-not-allowed' : 'bg-green-700 hover:bg-green-800'}`}
+                                    >
+                                        {isDownloading ? 'Processing JPG...' : 'Download All as JPG'}
+                                    </button>
+                                </div>
+                                {isDownloading && (
+                                    <p className="text-sm text-center text-yellow-400">Don't close the window while images are downloading.</p>
+                                )}
+                            </div>
+                        </div>
+
+                    </div>
+                    
+                    {/* --- Hidden Slides for Export (All slides are rendered here for html2canvas) --- */}
+                    <div className="fixed top-0 left-0 w-full h-full -z-50 opacity-0 pointer-events-none">
+                        {slides.map((slide, index) => (
+                            <div 
+                                key={slide.id} 
+                                className="absolute" 
+                                style={{ top: index * 600, left: 0 }} 
+                            >
+                                <SlidePreview 
+                                    ref={(el) => setSlideRef(el, slide.id)}
+                                    slide={slide} 
+                                    brandSettings={brandSettings} 
+                                    index={index} 
+                                    totalSlides={slides.length}
+                                />
+                            </div>
+                        ))}
+                    </div>
+                    
+                </div>
+            );
+        };
+
+        // Render the application
+        // FIX: Replaced deprecated ReactDOM.render with modern ReactDOM.createRoot
+        const container = document.getElementById('root');
+        const root = ReactDOM.createRoot(container);
+        root.render(<App />);
+
+    </script>
+</body>
+</html>
