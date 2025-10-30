@@ -330,28 +330,32 @@
 
                     <label className="block text-sm font-medium text-gray-400">Number of Slides (2-10)</label>
                     
-                    <div className="flex items-center space-x-2">
-                        <button
-                            onClick={() => handleCountChange(-1)}
-                            disabled={isLoading || currentSlideCount <= 2}
-                            className="p-3 bg-gray-700 text-white rounded-lg hover:bg-gray-600 disabled:opacity-50 transition font-extrabold text-lg w-1/5"
-                        >
-                            -
-                        </button>
-                        <input
-                            type="text"
-                            readOnly
-                            value={aiSlideCount} 
-                            className="flex-1 text-center p-3 bg-gray-700 border border-indigo-500 rounded-lg text-white text-xl font-extrabold"
-                        />
-                        <button
-                            onClick={() => handleCountChange(1)}
-                            disabled={isLoading || currentSlideCount >= 10}
-                            className="p-3 bg-gray-700 text-white rounded-lg hover:bg-gray-600 disabled:opacity-50 transition font-extrabold text-lg w-1/5"
-                        >
-                            +
-                        </button>
-                    </div>
+<div className="flex items-center justify-center gap-2 w-full">
+  <button
+    onClick={() => handleCountChange(-1)}
+    disabled={isLoading || currentSlideCount <= 2}
+    className="flex-shrink-0 p-3 bg-gray-700 text-white rounded-lg hover:bg-gray-600 disabled:opacity-50 transition font-extrabold text-lg"
+  >
+    -
+  </button>
+
+  <div className="flex-grow">
+    <input
+      type="text"
+      readOnly
+      value={aiSlideCount}
+      className="w-full text-center p-3 bg-gray-700 border border-indigo-500 rounded-lg text-white text-xl font-extrabold"
+    />
+  </div>
+
+  <button
+    onClick={() => handleCountChange(1)}
+    disabled={isLoading || currentSlideCount >= 10}
+    className="flex-shrink-0 p-3 bg-gray-700 text-white rounded-lg hover:bg-gray-600 disabled:opacity-50 transition font-extrabold text-lg"
+  >
+    +
+  </button>
+</div>
 
                     <button
                         onClick={generateContentAI}
