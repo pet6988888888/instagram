@@ -159,8 +159,8 @@
                         </p>
                     </div>
 
-                    {/* --- Bottom Arrow & Pagination --- */}
-                    <div className="flex justify-end items-center mt-4">
+                    {/* Bottom Arrow & Pagination - Fixed Position */}
+        <div className="absolute bottom-8 right-8 flex justify-end items-center">
                         {
                             !isLastSlide ? (
                                 <ArrowRight className="w-12 h-12" accentColor={accentColor} />
@@ -986,5 +986,6 @@
     </script>
 </body>
 </html>
+
 
 
