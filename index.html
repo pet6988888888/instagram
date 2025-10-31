@@ -168,7 +168,7 @@
                     </div>
 
                     {/* Bottom Arrow & Pagination - Fixed Position */}
-        <div className="absolute bottom-8 right-8 flex justify-end items-center">
+                    <div className="absolute bottom-8 right-8 flex justify-end items-center">
                         {
                             !isLastSlide ? (
                                 <ArrowRight className="w-12 h-12" accentColor={accentColor} />
@@ -568,6 +568,7 @@
             const [isLoading, setIsLoading] = useState(false);
             const [isDownloading, setIsDownloading] = useState(false);
             const [contentMode, setContentMode] = useState('manual');
+            const [exportFormat, setExportFormat] = useState('png'); // 'png' or 'jpeg'
             
             // REFS
             const slideRefs = useRef({}); 
@@ -683,6 +684,7 @@
                         link.href = dataUrl;
                         link.download = `carousel_slide_${i + 1}_${slides[i].title.replace(/\s/g, '_').substring(0, 20)}.${format}`;
                         
+                        // Append + click for better mobile support
                         document.body.appendChild(link);
                         link.click();
                         document.body.removeChild(link);
@@ -699,19 +701,84 @@
             // --- END DOWNLOAD LOGIC ---
 
 
+            // --- NEW FUNCTION: Download Only Active Slide ---
+            const handleDownloadSingle = async (format = 'png') => {
+                if (typeof window.html2canvas === 'undefined') {
+                    console.error('html2canvas not loaded.');
+                    return;
+                }
+
+                const currentSlide = slides[activeSlideIndex];
+                if (!currentSlide) {
+                    console.warn('No active slide to download.');
+                    return;
+                }
+
+                setIsDownloading(true);
+                try {
+                    const element = slideRefs.current[currentSlide.id];
+                    if (!element) {
+                        console.error('Slide element not found.');
+                        setIsDownloading(false);
+                        return;
+                    }
+
+                    const canvas = await window.html2canvas(element, {
+                        scale: 3,
+                        useCORS: true,
+                        allowTaint: true
+                    });
+
+                    const dataUrl = canvas.toDataURL(`image/${format}`, format === 'jpeg' ? 0.9 : 1.0);
+                    const link = document.createElement('a');
+                    link.href = dataUrl;
+                    link.download = `slide_${activeSlideIndex + 1}_${currentSlide.title.replace(/\s/g, '_').substring(0, 20)}.${format}`;
+                    
+                    // Append + click for mobile compatibility
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+
+                } catch (error) {
+                    console.error('Error downloading single slide:', error);
+                } finally {
+                    setIsDownloading(false);
+                }
+            };
+            // ------------------------------------------------------------------
+
+
             // --- UI Components ---
 
-            const ColorPicker = ({ label, value, onChange, colorKey }) => (
-                <div className="flex items-center justify-between">
-                    <label className="text-sm font-medium text-gray-400">{label}</label>
-                    <input
-                        type="color"
-                        value={value}
-                        onChange={(e) => onChange(colorKey, e.target.value)}
-                        className="w-10 h-10 border-2 border-gray-600 rounded-lg cursor-pointer"
-                    />
-                </div>
-            );
+            const ColorPicker = ({ label, value, onChange, colorKey }) => {
+    const [localColor, setLocalColor] = React.useState(value);
+
+    React.useEffect(() => {
+        setLocalColor(value);
+    }, [value]);
+
+    const handleChange = (e) => {
+        setLocalColor(e.target.value); // update live preview
+    };
+
+    const handleCommit = () => {
+        onChange(colorKey, localColor); // commit after picker closes
+    };
+
+    return (
+        <div className="flex items-center justify-between">
+            <label className="text-sm font-medium text-gray-400">{label}</label>
+            <input
+                type="color"
+                value={localColor}
+                onChange={handleChange}
+                onBlur={handleCommit}
+                className="w-10 h-10 border-2 border-gray-600 rounded-lg cursor-pointer"
+            />
+        </div>
+    );
+};
+
             
             const BrandSetupPanel = () => (
                 <div className="space-y-4">
@@ -955,19 +1022,32 @@
                                 <h3 className="text-lg font-bold text-white">Export Slides</h3>
                                 
                                 <div className="space-y-3">
+                                    <label className="text-sm text-gray-300">Format</label>
+                                    <select
+                                        value={exportFormat}
+                                        onChange={(e) => setExportFormat(e.target.value)}
+                                        className="w-full p-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm"
+                                    >
+                                        <option value="png">PNG (Best quality)</option>
+                                        <option value="jpeg">JPG (Smaller files)</option>
+                                    </select>
+
+                                    {/* Download ALL Slides (Desktop Recommended) */}
                                     <button
-                                        onClick={() => handleDownload('png')}
+                                        onClick={() => handleDownload(exportFormat)}
                                         disabled={isDownloading || slides.length === 0}
                                         className={`w-full p-3 text-white font-semibold rounded-lg transition ${isDownloading ? 'bg-green-700/50 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700'}`}
                                     >
-                                        {isDownloading ? 'Processing PNG...' : 'Download All as PNG'}
+                                        {isDownloading ? 'Processing All Slides...' : '💻 Download All Slides (Desktop Only)'}
                                     </button>
+
+                                    {/* Download Single Slide (Mobile Friendly) */}
                                     <button
-                                        onClick={() => handleDownload('jpeg')}
+                                        onClick={() => handleDownloadSingle(exportFormat)}
                                         disabled={isDownloading || slides.length === 0}
-                                        className={`w-full p-3 text-white font-semibold rounded-lg transition ${isDownloading ? 'bg-green-800/50 cursor-not-allowed' : 'bg-green-700 hover:bg-green-800'}`}
+                                        className={`w-full p-3 text-white font-semibold rounded-lg transition ${isDownloading ? 'bg-blue-700/50 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'}`}
                                     >
-                                        {isDownloading ? 'Processing JPG...' : 'Download All as JPG'}
+                                        {isDownloading ? 'Processing...' : `📱 Download Current Slide (${activeSlideIndex + 1}/${slides.length})`}
                                     </button>
                                 </div>
                                 {isDownloading && (
