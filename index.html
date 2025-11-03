@@ -4,6 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>IG Carousel Creator</title>
+
+    <!-- LOAD GOOGLE FONTS (fixes font picker) -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=Montserrat:wght@400;600;800&family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+
     <!-- Load Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Configure Tailwind to use 'Inter' font and enable custom colors -->
@@ -97,23 +101,46 @@
         const Edit = (props) => ( <Icon {...props}><path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 18.288a.75.75 0 01-.225.594l-3.25 3.25a.75.75 0 01-.981-.227l-2.65-2.65a.75.75 0 01-.227-.981l3.25-3.25a.75.75 0 01.594-.225l10.58-10.58z" /></Icon> );
 
         // ----------------------------------------------------------------------
+        // Helper: platform dimensions
+        // ----------------------------------------------------------------------
+        const getPlatformDimensions = (platform) => {
+            // returns aspect ratio string for CSS style, maxWidth px, and minHeight px
+            switch (platform) {
+                case 'reels':
+                case 'youtube':
+                case 'tiktok':
+                    // 9:16 portrait (tall)
+                    return { aspect: '9 / 16', maxWidth: 360, minHeight: 640 };
+                case 'instagram':
+                default:
+                    // 4:5 portrait (standard IG)
+                    return { aspect: '4 / 5', maxWidth: 400, minHeight: 500 };
+            }
+        };
+
+        // ----------------------------------------------------------------------
         // 1. Core Component: SlidePreview 
         // ----------------------------------------------------------------------
-        const SlidePreview = React.forwardRef(({ slide, brandSettings, index, totalSlides }, ref) => {
+        const SlidePreview = React.forwardRef(({ slide, brandSettings, index, totalSlides, exportPlatform }, ref) => {
             const { bgColor, textColor, headlineColor, accentColor, fontFamily, profile } = brandSettings;
             const { title, body, icon } = slide;
 
             const isLastSlide = index === totalSlides - 1;
 
+            // compute platform sizing
+            const { aspect, maxWidth, minHeight } = getPlatformDimensions(exportPlatform || 'instagram');
+
             return (
                 <div 
                     ref={ref}
-                    className="w-full aspect-[4/5] max-w-[400px] h-auto p-8 rounded-xl shadow-2xl relative flex flex-col justify-between"
+                    className="w-full p-8 shadow-2xl relative flex flex-col justify-between"
                     style={{ 
                         backgroundColor: bgColor, 
                         color: textColor, 
                         fontFamily: `${fontFamily}, sans-serif`,
-                        minHeight: '500px'
+                        maxWidth: `${maxWidth}px`,
+                        aspectRatio: aspect,
+                        minHeight: `${minHeight}px`
                     }}
                 >
                     {/* --- Profile Header (Always Top) --- */}
@@ -122,7 +149,7 @@
                             <img 
                                 src={profile.photoUrl} 
                                 alt="Profile" 
-                                className="w-12 h-12 rounded-full border-4 object-cover"
+                                className="w-12 h-12 rounded-full border-2 object-cover"
                                 style={{ borderColor: accentColor }}
                                 onError={(e) => {
                                     e.target.onerror = null; 
@@ -569,6 +596,8 @@
             const [isDownloading, setIsDownloading] = useState(false);
             const [contentMode, setContentMode] = useState('manual');
             const [exportFormat, setExportFormat] = useState('png'); // 'png' or 'jpeg'
+            const [exportPlatform, setExportPlatform] = useState('instagram'); // default platform
+
             
             // REFS
             const slideRefs = useRef({}); 
@@ -673,8 +702,8 @@
 
                         // Use the currently rendered element in the hidden area for high-quality export
                         const canvas = await window.html2canvas(element, {
-                            scale: 3, 
-                            useCORS: true, 
+                            scale: 3,
+                            useCORS: true,
                             allowTaint: true
                         });
 
@@ -788,7 +817,21 @@
                     <ColorPicker label="Headline Color" value={brandSettings.headlineColor} onChange={handleBrandChange} colorKey="headlineColor" />
                     <ColorPicker label="Accent/CTA Color" value={brandSettings.accentColor} onChange={handleBrandChange} colorKey="accentColor" />
 
+                    
+                    <label className="block text-sm font-medium text-gray-400">Platform</label>
+                    <select
+                        value={exportPlatform}
+                        onChange={(e) => setExportPlatform(e.target.value)}
+                        className="w-full p-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:ring-indigo-500 focus:border-indigo-500 mb-4"
+                    >
+                        <option value="instagram">Instagram Carousel (4:5)</option>
+                        <option value="reels">Instagram Reels (9:16)</option>
+                        <option value="youtube">YouTube Shorts (9:16)</option>
+                        <option value="tiktok">TikTok (9:16)</option>
+                    </select>
+
                     <div className="border-t border-gray-700 pt-4 space-y-3">
+
                         <h4 className="font-semibold text-gray-300">Profile Header</h4>
                         
                         <div className="flex items-center space-x-3 p-2 bg-gray-700 rounded-lg">
@@ -835,7 +878,7 @@
                                 id="verified-badge"
                                 checked={brandSettings.profile.isVerified}
                                 onChange={(e) => handleBrandChange('profileVerified', e.target.checked)}
-                                className="w-4 h-4 text-indigo-600 bg-gray-600 border-gray-500 rounded focus:ring-indigo-500"
+                                className="w-4 h-4 text-indigo-600 bg_gray-600 border-gray-500 rounded focus:ring-indigo-500"
                             />
                             <label htmlFor="verified-badge" className="text-sm text-gray-300 cursor-pointer">
                                 Show Verification Badge
@@ -972,17 +1015,24 @@
                             {/* Preview */}
                             <div className="flex justify-center items-center w-full">
                                 {slides.length > 0 && (
-                                    <SlidePreview 
-                                        // Set the ref for the currently active slide (important for Download)
-                                        ref={(el) => setSlideRef(el, activeSlide.id)}
-                                        slide={activeSlide} 
-                                        brandSettings={brandSettings} 
-                                        index={activeSlideIndex} 
-                                        totalSlides={slides.length}
-                                    />
+                                    <div
+                                        className="w-full flex justify-center"
+                                        style={{
+                                            // wrapper doesn't force a specific aspect; SlidePreview controls sizing with exportPlatform
+                                        }}
+                                    >
+                                        <SlidePreview
+                                            ref={(el) => setSlideRef(el, activeSlide.id)}
+                                            slide={activeSlide}
+                                            brandSettings={brandSettings}
+                                            index={activeSlideIndex}
+                                            totalSlides={slides.length}
+                                            exportPlatform={exportPlatform}    /* <-- pass platform here */
+                                        />
+                                    </div>
                                 )}
                                 {slides.length === 0 && (
-                                     <div className="w-full aspect-[4/5] max-w-[400px] h-auto p-8 rounded-xl shadow-2xl relative flex items-center justify-center bg-gray-800 border-4 border-dashed border-gray-600" style={{ minHeight: '500px' }}>
+                                     <div className="w-full aspect-[4/5] max-w-[400px] h-auto p-8 shadow-2xl relative flex items-center justify-center bg-gray-800 border-4 border-dashed border-gray-600" style={{ minHeight: '500px' }}>
                                         <p className="text-gray-400 font-semibold text-center">No Slides. Use Auto Generate or Add a Slide manually.</p>
                                     </div>
                                 )}
@@ -1064,7 +1114,7 @@
                             <div 
                                 key={slide.id} 
                                 className="absolute" 
-                                style={{ top: index * 600, left: 0 }} 
+                                style={{ top: index * 1200, left: 0 }} 
                             >
                                 <SlidePreview 
                                     ref={(el) => setSlideRef(el, slide.id)}
@@ -1072,6 +1122,7 @@
                                     brandSettings={brandSettings} 
                                     index={index} 
                                     totalSlides={slides.length}
+                                    exportPlatform={exportPlatform}   /* <-- pass platform here too */
                                 />
                             </div>
                         ))}
